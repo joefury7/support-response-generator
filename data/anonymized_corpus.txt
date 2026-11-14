@@ -1,0 +1,44 @@
+Hello customer, thank you for contacting retail customer support!
+Dear customer, thank you for reaching out to customer support.
+Hello customer, your order [order_id] has been shipped via express delivery.
+You can track your package using tracking number [tracking_no].
+We apologize for the delivery delay caused by severe weather conditions.
+Your shipment is currently out for delivery and will arrive before 8:00 PM.
+If you need to change your delivery address, please contact [email] or call +1-555-0199.
+Thank you for your inquiry regarding tracking number [tracking_no].
+Your order was shipped on [date] and should arrive within 2 business days.
+Please note that international deliveries may experience customs clearance delays.
+We have verified that your order [order_id] has left our regional fulfillment center.
+A signature may be required upon delivery of your package.
+Thank you for reaching out regarding your return request for item [order_id].
+We have processed your full refund of [amount] to your original payment method.
+Please allow 3 to 5 business days for the funds to reflect in your bank account.
+We have attached a prepaid shipping label to your registered email [email].
+Items can be returned within 30 days of purchase in their original packaging.
+We are sorry to hear that the item was defective upon arrival.
+A replacement order [order_id] has been created at no additional charge.
+Once our warehouse receives the returned package, your refund will be released promptly.
+Thank you for contacting billing support regarding invoice [order_id].
+We have investigated the duplicate charge of [amount] on credit card ending in 4129.
+A store credit of [amount] has been credited to your retail account balance.
+Please update your payment method in your account settings under billing.
+The promotional discount code SAVE20 was successfully applied to your order total.
+We have issued a partial refund of [amount] for the promotional price adjustment.
+Your subscription billing cycle renews automatically on the first of each month.
+Hello customer, thank you for your patience while we review your account details.
+We have verified your account credentials associated with phone [phone].
+Is there anything else I can help you with today?
+Have a wonderful day and thank you for shopping with our retail store!
+Thank you for choosing our retail service and please feel free to reach out anytime.
+Dear customer, we are pleased to confirm that your return [order_id] has been approved.
+Your return package was received at our sorting facility on [date].
+Refunds to debit cards typically post within 48 to 72 business hours.
+We apologize for any inconvenience caused and appreciate your continued loyalty.
+If your package shows as delivered but you cannot find it, please check with neighbors.
+Carrier GPS coordinates confirm that delivery was completed at the front porch.
+Our team is investigating the lost transit report with the shipping courier.
+We have dispatched a priority replacement item with tracking number [tracking_no].
+Your satisfaction is our highest priority and we are eager to make this right.
+Thank you for providing the photos of the damaged delivery box.
+A claims specialist will contact you at [email] within 24 hours.
+Thank you for shopping with us and have a pleasant evening!

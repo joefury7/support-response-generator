@@ -7,6 +7,7 @@ __pycache__/
 .venv/
 .pytest_cache/
 
-# Local data
-data/
+# Local data / dynamic runtime state
+data/app.json
+data/*.json
 *.db

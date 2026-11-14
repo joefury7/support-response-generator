@@ -1,0 +1,10 @@
+Hello customer, thank you for contacting shipping support.
+Your order has been shipped via express courier service.
+You can track your package using the provided tracking number.
+Your delivery is scheduled to arrive between 9 AM and 5 PM.
+We apologize for the delivery delay due to severe weather.
+The package is currently in transit to your local distribution hub.
+A signature is required upon delivery for this high value item.
+Please ensure someone is available at your delivery address today.
+If you need to reschedule delivery, you can manage options on the courier portal.
+Your shipment has arrived safely at your local post office.

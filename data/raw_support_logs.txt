@@ -1,18 +1,21 @@
-Hello John, thank you for contacting retail customer support!
+Hello John, thank you for contacting retail customer support today.
 Dear Sarah, thank you for reaching out to customer support.
 Hello Michael, your order #ORD-84920 has been shipped via express delivery.
 You can track your package using tracking number TRK-92837192.
+We apologize for the inconvenience this may have caused you.
 We apologize for the delivery delay caused by severe weather conditions.
-Your shipment is currently out for delivery and will arrive before 8:00 PM.
+We apologize for the unexpected delay in shipping your order.
+Your shipment is currently out for delivery and will arrive before 8:00 PM today.
 If you need to change your delivery address, please contact support@retailstore.com or call +1-555-0199.
 Thank you for your inquiry regarding tracking number TRK-10928341.
-Your order was shipped on 11/12/2026 and should arrive within 2 business days.
+Your order was shipped on 11/12/2026 and should arrive within 2 to 3 business days.
 Please note that international deliveries may experience customs clearance delays.
 We have verified that your order #ORD-39102 has left our regional fulfillment center.
 A signature may be required upon delivery of your package.
 Thank you for reaching out regarding your return request for item #ITM-1029.
 We have processed your full refund of $49.99 to your original payment method.
-Please allow 3 to 5 business days for the funds to reflect in your bank account.
+Please allow 3 to 5 business days for the refund to reflect on your bank statement.
+Please allow 3 to 5 business days for the funds to appear in your account.
 We have attached a prepaid shipping label to your registered email alice.walker@example.com.
 Items can be returned within 30 days of purchase in their original packaging.
 We are sorry to hear that the item was defective upon arrival.
@@ -28,6 +31,7 @@ Your subscription billing cycle renews automatically on the first of each month.
 Hello David, thank you for your patience while we review your account details.
 We have verified your account credentials associated with phone +1-800-555-0144.
 Is there anything else I can help you with today?
+Please let us know if you need any further assistance with your order.
 Have a wonderful day and thank you for shopping with our retail store!
 Thank you for choosing our retail service and please feel free to reach out anytime.
 Dear Emily, we are pleased to confirm that your return #RET-44819 has been approved.
@@ -42,3 +46,8 @@ Your satisfaction is our highest priority and we are eager to make this right.
 Thank you for providing the photos of the damaged delivery box.
 A claims specialist will contact you at bob.miller@service.net within 24 hours.
 Thank you for shopping with us and have a pleasant evening!
+We apologize for the inconvenience and thank you for your patience while we resolve this.
+Please allow 24 to 48 hours for the tracking information to update online.
+Our team is available 24 hours a day to assist you with any questions.
+Your refund has been approved and will be credited to your account shortly.
+We have sent a confirmation email with your order details and invoice.

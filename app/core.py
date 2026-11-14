@@ -27,30 +27,29 @@ def to_sentences(text: str) -> list[str]:
 
 def to_tokens(sentence: str) -> list[str]:
     """
-    Extract tokens: lowercase words, contractions, and special tokens (e.g. [order_id]).
+    Extract tokens: lowercase words, numbers, contractions, and special tokens (e.g. [order_id]).
     """
-    return re.findall(r"\[[a-z_]+\]|[a-z']+", sentence.lower())
+    return re.findall(r"\[[a-z_]+\]|[a-z0-9']+", sentence.lower())
 
 
 # ==============================================================================
 # Milestone 1: Corpus Anonymization & Data Cleaning
 # ==============================================================================
 
-# Regex patterns for Personally Identifiable Information (PII)
 PII_PATTERNS = [
     # Emails
     (r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "[email]"),
-    # Order IDs (e.g. #ORD-84920, ORD-12345, #ITM-1029, #RET-44819, #INV-59281)
+    # Order / Return / Invoice / Item IDs
     (r"#?(ORD|ITM|RET|INV)-[0-9]{4,6}\b", "[order_id]"),
-    # Tracking numbers (e.g. TRK-92837192, TRK-10928341)
+    # Carrier tracking numbers
     (r"\bTRK-[0-9]{8,12}\b", "[tracking_no]"),
-    # Phone numbers (e.g. +1-555-0199, +1-800-555-0144, (555) 123-4567)
+    # Phone numbers
     (r"(?:\+\d{1,2}\s?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}|\+1[-.\s]?\d{3}[-.\s]?\d{4}\b", "[phone]"),
-    # Currency amounts (e.g. $49.99, $25.00, $12.00)
+    # Currency amounts
     (r"\$\d+(?:\.\d{2})?\b", "[amount]"),
-    # Dates (e.g. 11/12/2026, 10/25/2026)
+    # Dates
     (r"\b\d{1,2}/\d{1,2}/\d{4}\b", "[date]"),
-    # Customer name placeholders in greetings (e.g. "Hello John,", "Dear Sarah,")
+    # Customer name placeholders in greetings
     (r"\b(Hello|Dear|Hi)\s+[A-Z][a-z]+,", r"\1 customer,"),
 ]
 
@@ -70,7 +69,6 @@ def anonymize_text(text: str) -> tuple[str, dict[str, int]]:
             counts[token_key] += matches
             anonymized = re.sub(pattern, replacement, anonymized, flags=re.IGNORECASE)
 
-    # Normalize excessive spaces
     anonymized = re.sub(r"[ \t]+", " ", anonymized)
     return anonymized.strip(), dict(counts)
 
@@ -137,41 +135,59 @@ def build_ngram_counts(sents: list[str], n: int = 2) -> dict[tuple[str, ...], Co
 
 class SupportNGramLM:
     """
-    Production-grade statistical N-gram Language Model designed for support response drafting.
-    Includes Laplace (Add-k) smoothing and Jelinek-Mercer linear interpolation.
+    Statistical N-gram Language Model designed for support response drafting.
+    Includes Add-k (Laplace) smoothing, Jelinek-Mercer linear interpolation,
+    and Hierarchical Backoff across context lengths (up to 4-grams).
     """
 
-    def __init__(self, n: int = 2, k: float = 0.5, interpolation: bool = False):
-        self.n = n
+    def __init__(self, n: int = 4, k: float = 0.5, interpolation: bool = False):
+        self.n = max(2, n)
         self.k = k
         self.use_interpolation = interpolation
         self.sents: list[str] = []
+        self.order_counts: dict[int, dict[tuple[str, ...], Counter]] = {}
         self.foll: dict[tuple[str, ...], Counter] = defaultdict(Counter)
         self.uni_counts: Counter = Counter()
-        self.bi_counts: dict[tuple[str, ...], Counter] = defaultdict(Counter)
-        self.tri_counts: dict[tuple[str, ...], Counter] = defaultdict(Counter)
         self.V: set[str] = set()
 
     def fit(self, text: str) -> SupportNGramLM:
-        """Train the n-gram model on the given text corpus."""
+        """Train multi-order n-gram model on the given text corpus."""
         self.sents = to_sentences(text)
-        self.foll = build_ngram_counts(self.sents, self.n)
 
-        # Precompute unigram, bigram, trigram for interpolation
+        # Unigram counts
         self.uni_counts = Counter(t for s in self.sents for t in to_tokens(s))
         self.uni_counts["</s>"] = len(self.sents)
-        self.bi_counts = build_ngram_counts(self.sents, 2)
-        self.tri_counts = build_ngram_counts(self.sents, 3)
-
         self.V = set(self.uni_counts.keys()) | {"</s>", "<unk>"}
+
+        # Build counts for all orders up to self.n
+        for order in range(2, max(5, self.n + 1)):
+            self.order_counts[order] = build_ngram_counts(self.sents, order)
+
+        self.foll = self.order_counts.get(self.n, build_ngram_counts(self.sents, self.n))
         return self
+
+    def get_backoff_counter(self, tokens: list[str]) -> tuple[tuple[str, ...], Counter]:
+        """
+        Hierarchical backoff: searches from largest context window down to unigram.
+        """
+        max_order = max(self.order_counts.keys()) if self.order_counts else self.n
+        for order in range(max_order, 1, -1):
+            ctx_len = order - 1
+            ctx = tuple((["<s>"] * ctx_len + tokens)[-ctx_len:])
+            counts_map = self.order_counts.get(order, {})
+            if ctx in counts_map and counts_map[ctx]:
+                return ctx, counts_map[ctx]
+
+        return ("<s>",), Counter(self.uni_counts)
 
     def prob_addk(self, ctx: tuple[str, ...], w: str) -> float:
         """
         Add-k (Laplace) smoothed probability:
         P(w | ctx) = (count(ctx, w) + k) / (count(ctx) + k * |V|)
         """
-        c = self.foll.get(ctx, Counter())
+        order = len(ctx) + 1
+        counts_map = self.order_counts.get(order, self.foll)
+        c = counts_map.get(ctx, Counter())
         total = sum(c.values())
         return (c[w] + self.k) / (total + self.k * len(self.V))
 
@@ -185,14 +201,16 @@ class SupportNGramLM:
         p_uni = (self.uni_counts[w] + 1e-5) / (total_tokens + 1e-5 * len(self.V))
 
         # Bigram
+        bi_map = self.order_counts.get(2, {})
         bi_ctx = (ctx[-1],) if ctx else ("<s>",)
-        bi_c = self.bi_counts.get(bi_ctx, Counter())
+        bi_c = bi_map.get(bi_ctx, Counter())
         bi_total = sum(bi_c.values())
         p_bi = (bi_c[w] + self.k) / (bi_total + self.k * len(self.V))
 
         # Trigram
+        tri_map = self.order_counts.get(3, {})
         tri_ctx = ctx[-2:] if len(ctx) >= 2 else (("<s>",) * (2 - len(ctx)) + ctx)
-        tri_c = self.tri_counts.get(tri_ctx, Counter())
+        tri_c = tri_map.get(tri_ctx, Counter())
         tri_total = sum(tri_c.values())
         p_tri = (tri_c[w] + self.k) / (tri_total + self.k * len(self.V))
 
@@ -234,7 +252,6 @@ def milestone_2(corpus_path: str | None = None) -> dict[str, Any]:
     corpus_text = c_path.read_text(encoding="utf-8")
     sents = to_sentences(corpus_text)
 
-    # 80/20 train/test split
     rng = random.Random(42)
     shuffled = list(sents)
     rng.shuffle(shuffled)
@@ -264,21 +281,21 @@ def milestone_2(corpus_path: str | None = None) -> dict[str, Any]:
 
 def suggest_next_words(model: SupportNGramLM, text: str, top_k: int = 3) -> list[tuple[str, float]]:
     """
-    Given a partial prompt, compute next-word probability distribution and return top-k choices.
+    Given partial text context, compute candidate next-word ranking with relative confidence.
+    Uses hierarchical backoff for natural, context-aware predictions.
     """
     tokens = to_tokens(text)
-    ctx = tuple((["<s>"] * (model.n - 1) + tokens)[-(model.n - 1) :])
-    c = model.foll.get(ctx, Counter())
+    ctx, counter = model.get_backoff_counter(tokens)
 
-    # If observed context, rank by empirical + smoothed prob
-    if c:
-        candidates = [(w, model.prob(ctx, w)) for w in c if w != "</s>"]
-        candidates.sort(key=lambda kv: kv[1], reverse=True)
-        return [(w, round(p, 4)) for w, p in candidates[:top_k]]
+    # Filter out sentence terminator for inline autocomplete suggestions
+    valid_candidates = {w: count for w, count in counter.items() if w != "</s>"}
+    if not valid_candidates:
+        valid_candidates = {w: count for w, count in model.uni_counts.items() if w != "</s>"}
 
-    # If unobserved, fallback to unigram ranking
-    top_uni = [w for w, _ in model.uni_counts.most_common(top_k + 2) if w != "</s>"]
-    return [(w, round(model.prob(ctx, w), 4)) for w in top_uni[:top_k]]
+    total_valid = sum(valid_candidates.values()) or 1
+    ranked = sorted(valid_candidates.items(), key=lambda kv: kv[1], reverse=True)[:top_k]
+
+    return [(w, round(count / total_valid, 4)) for w, count in ranked]
 
 
 def generate_continuation(
@@ -286,64 +303,57 @@ def generate_continuation(
     prompt: str,
     max_tokens: int = 25,
     seed: int | None = None,
-    temperature: float = 0.7,
+    temperature: float = 0.0,
     top_p: float = 0.9,
 ) -> str:
     """
-    Autoregressively generate next words following the prompt using top-p (nucleus) sampling.
+    Autoregressively generate next words following the prompt using hierarchical backoff.
+    Default temperature 0.0 uses greedy argmax for coherent, professional customer support sentences.
     """
     rng = random.Random(seed) if seed is not None else random.Random()
     tokens = to_tokens(prompt)
-    ctx = tuple((["<s>"] * (model.n - 1) + tokens)[-(model.n - 1) :])
-
     generated_tokens: list[str] = []
 
     for _ in range(max_tokens):
-        c = model.foll.get(ctx)
+        current_tokens = tokens + generated_tokens
+        ctx, c = model.get_backoff_counter(current_tokens)
         if not c:
-            # Fallback to high-frequency vocabulary if context runs dry
-            words = [w for w, _ in model.uni_counts.most_common(20) if w != "</s>"]
-            weights = [model.uni_counts[w] for w in words]
-        else:
-            words, weights = list(zip(*c.items()))
-            words, weights = list(words), list(weights)
+            break
 
-        # Apply temperature
-        if temperature > 0:
-            adj_weights = [math.pow(max(w, 1e-4), 1.0 / max(temperature, 0.1)) for w in weights]
-        else:
-            # Greedy argmax
-            best_idx = max(range(len(weights)), key=lambda i: weights[i])
+        words, counts = list(zip(*c.items()))
+        words, counts = list(words), list(counts)
+
+        # Greedy argmax (standard for accurate support response drafting)
+        if temperature <= 0.05:
+            best_idx = max(range(len(counts)), key=lambda i: counts[i])
             nxt = words[best_idx]
-            if nxt == "</s>":
-                break
-            generated_tokens.append(nxt)
-            ctx = (ctx + (nxt,))[-(model.n - 1) :]
-            continue
+        else:
+            # Temperature scaling
+            adj_weights = [math.pow(max(cnt, 1e-4), 1.0 / max(temperature, 0.1)) for cnt in counts]
+            total_wt = sum(adj_weights)
+            probs = [w / total_wt for w in adj_weights]
 
-        # Top-p (nucleus) filtering
-        total_wt = sum(adj_weights)
-        probs = [w / total_wt for w in adj_weights]
-        sorted_pairs = sorted(zip(words, probs), key=lambda x: x[1], reverse=True)
+            # Top-p (nucleus) filtering
+            sorted_pairs = sorted(zip(words, probs), key=lambda x: x[1], reverse=True)
+            filtered_words, filtered_weights = [], []
+            cum = 0.0
+            for w, pr in sorted_pairs:
+                filtered_words.append(w)
+                filtered_weights.append(pr)
+                cum += pr
+                if cum >= top_p:
+                    break
+            nxt = rng.choices(filtered_words, weights=filtered_weights)[0]
 
-        cumulative = 0.0
-        filtered_words, filtered_weights = [], []
-        for word, pr in sorted_pairs:
-            filtered_words.append(word)
-            filtered_weights.append(pr)
-            cumulative += pr
-            if cumulative >= top_p:
-                break
-
-        nxt = rng.choices(filtered_words, weights=filtered_weights)[0]
         if nxt == "</s>":
             break
 
         generated_tokens.append(nxt)
-        ctx = (ctx + (nxt,))[-(model.n - 1) :]
 
-    full_output = (prompt.strip() + " " + " ".join(generated_tokens)).strip()
-    return full_output
+    completed = (prompt.strip() + " " + " ".join(generated_tokens)).strip()
+    if not completed.endswith((".", "!", "?")):
+        completed += "."
+    return completed
 
 
 def milestone_3(model: SupportNGramLM | None = None) -> dict[str, Any]:
@@ -355,7 +365,7 @@ def milestone_3(model: SupportNGramLM | None = None) -> dict[str, Any]:
         c_path = Path("data/anonymized_corpus.txt")
         if not c_path.exists():
             milestone_1()
-        model = SupportNGramLM(n=2, k=0.5).fit(c_path.read_text(encoding="utf-8"))
+        model = SupportNGramLM(n=4, k=0.5).fit(c_path.read_text(encoding="utf-8"))
 
     test_prompts = [
         "thank you for contacting",
@@ -383,8 +393,8 @@ def format_suggestions_table(prompt: str, suggestions: list[tuple[str, float]]) 
     lines = [f"Prompt: \"{prompt}\"", "Next-word suggestions:"]
     for idx, (word, prob) in enumerate(suggestions, 1):
         confidence = f"{prob * 100:5.1f}%"
-        bar = "█" * int(prob * 20)
-        lines.append(f"  [{idx}] {word:<15} (prob: {prob:.4f} | {confidence}) {bar}")
+        bar = "█" * max(1, int(prob * 20))
+        lines.append(f"  [{idx}] {word:<15} (confidence: {confidence}) {bar}")
     return "\n".join(lines)
 
 
@@ -396,12 +406,12 @@ def milestone_4(prompt: str = "thank you for contacting customer") -> dict[str, 
     c_path = Path("data/anonymized_corpus.txt")
     if not c_path.exists():
         milestone_1()
-    model = SupportNGramLM(n=2, k=0.5).fit(c_path.read_text(encoding="utf-8"))
+    model = SupportNGramLM(n=4, k=0.5).fit(c_path.read_text(encoding="utf-8"))
 
     suggs = suggest_next_words(model, prompt, top_k=3)
     completed = generate_continuation(model, prompt, max_tokens=15, seed=0)
-
     formatted = format_suggestions_table(prompt, suggs)
+
     return {
         "status": "success",
         "prompt": prompt,
@@ -418,7 +428,7 @@ def milestone_4(prompt: str = "thank you for contacting customer") -> dict[str, 
 class SupportAssistant:
     """
     High-level Support Assistant managing domain corpora, response templates,
-    and agent feedback tracking.
+    and agent feedback tracking with Hierarchical Backoff.
     """
 
     def __init__(self, data_path: str = "data/app.json"):
@@ -428,19 +438,19 @@ class SupportAssistant:
         self._init_default_templates()
 
     def _init_corpora(self) -> None:
-        """Load and train category-specific models."""
+        """Load and train category-specific models with 4-gram context and hierarchical backoff."""
         corpora_dir = Path("data/corpora")
         if corpora_dir.exists():
             for p in corpora_dir.glob("*.txt"):
                 category = p.stem
                 text = p.read_text(encoding="utf-8")
-                self.models[category] = SupportNGramLM(n=2, k=0.5).fit(text)
+                self.models[category] = SupportNGramLM(n=4, k=0.5).fit(text)
 
         # Main combined model
         main_corpus = Path("data/anonymized_corpus.txt")
         if not main_corpus.exists():
             milestone_1()
-        self.models["general"] = SupportNGramLM(n=2, k=0.5).fit(main_corpus.read_text(encoding="utf-8"))
+        self.models["general"] = SupportNGramLM(n=4, k=0.5).fit(main_corpus.read_text(encoding="utf-8"))
 
     def _init_default_templates(self) -> None:
         """Initialize standard support templates if empty."""
